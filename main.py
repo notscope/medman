@@ -14,8 +14,8 @@ warnings.filterwarnings("ignore", category=UserWarning, module="PIL")
 
 # --- CONFIGURABLE PARAMETERS ---
 DEFAULT_VIDEO_FRAMES = 20
-HIGH_THRESHOLD = 0.95
-LOW_THRESHOLD = 0.85
+HIGH_THRESHOLD = 0.95 # for automatic deduplication
+LOW_THRESHOLD = 0.85 # for interactive review
 
 # --- UTILITY FUNCTIONS ---
 
@@ -164,7 +164,7 @@ def review_image_pair(path1, path2, meta1, meta2, similarity, on_decision):
     y1 = (box_h - img1_resized.height) // 2
     canvas1.create_image(x1, y1, image=tk_img1, anchor=tk.NW)
     canvas1.image = tk_img1
-    ttk.Label(left_frame, text=os.path.basename(path1), wraplength=box_w).pack(pady=2)
+    ttk.Label(left_frame, text=os.path.basename(path1), wraplength=box_w, font=("monospace", 12)).pack(pady=2)
 
     # Center frame with three rows: top spacer, content, bottom spacer
     center_frame = ttk.Frame(root)
@@ -219,7 +219,7 @@ def review_image_pair(path1, path2, meta1, meta2, similarity, on_decision):
     y2 = (box_h - img2_resized.height) // 2
     canvas2.create_image(x2, y2, image=tk_img2, anchor=tk.NW)
     canvas2.image = tk_img2
-    ttk.Label(right_frame, text=os.path.basename(path2), wraplength=box_w).pack(pady=2)
+    ttk.Label(right_frame, text=os.path.basename(path2), wraplength=box_w, font=("monospace", 12)).pack(pady=2)
 
     root.mainloop()
 
@@ -280,16 +280,16 @@ def review_video_pair(path1, path2, meta1, meta2, similarity, on_decision):
             # Actual content frame (vertically centered)
             content = ttk.Frame(center_frame)
             content.grid(row=1, column=0)
-
+            label_similarity = f"Similarity: {self.similarity*100:.2f}%\n"
             label_text = (
-                f"Similarity: {self.similarity*100:.2f}%\n"
                 f"Left: {self.format_meta(self.meta1)}\n"
                 f"Right: {self.format_meta(self.meta2)}"
             )
-            ttk.Label(content, text=label_text, font=("monospace", 15, "bold"), justify=tk.CENTER).pack(pady=5)
+            ttk.Label(content, text=label_similarity, font=("monospace", 20, "bold"), justify=tk.CENTER).pack()
+            ttk.Label(content, text=label_text, justify=tk.CENTER).pack(pady=5)
 
             btn_frame = ttk.Frame(content)
-            btn_frame.pack(pady=5)
+            btn_frame.pack(fill=tk.X, padx=10, pady=5)
             ttk.Button(btn_frame, text="A: Keep Left", command=lambda: self.decision('left')).pack(fill=tk.X, pady=2)
             ttk.Button(btn_frame, text="D: Keep Right", command=lambda: self.decision('right')).pack(fill=tk.X, pady=2)
             ttk.Button(btn_frame, text="W: Keep Both", command=lambda: self.decision('both')).pack(fill=tk.X, pady=2)
