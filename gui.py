@@ -64,17 +64,19 @@ def review_image_pair(path1, path2, meta1, meta2, similarity, on_decision):
     content.grid(row=1, column=0)
 
     # Metadata label
-    label = ttk.Label(
+    label_similarity_text = f"Similarity: {similarity*100:.2f}%\n"
+    label_text = ttk.Label(
         content,
         text=(
-            f"Similarity: {similarity*100:.2f}%\n"
             f"Left: {format_metadata(meta1)}\n"
             f"Right: {format_metadata(meta2)}"
         ),
-        font=("monospace", 15, "bold"),
         justify=tk.CENTER,
     )
-    label.pack(pady=5)
+
+    label_similarity = ttk.Label(content, text=label_similarity_text, font=("monospace", 20, "bold"), justify=tk.CENTER)
+    label_similarity.pack()
+    label_text.pack(pady=5)
 
     btn_frame = ttk.Frame(content)
     btn_frame.pack(fill=tk.X, padx=10, pady=5)
