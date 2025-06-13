@@ -1,11 +1,11 @@
 # --- INTERACTIVE REVIEW GUI FOR IMAGES ---
+import os
+import tkinter as tk
+from tkinter import ttk
+from PIL import Image, ImageTk
+import cv2
 
 def review_image_pair(path1, path2, meta1, meta2, similarity, on_decision):
-    import os
-    import tkinter as tk
-    from tkinter import ttk
-    from PIL import Image, ImageTk
-
     def decision(choice):
         root.destroy()
         on_decision(choice)
@@ -112,12 +112,6 @@ def review_image_pair(path1, path2, meta1, meta2, similarity, on_decision):
 # --- INTERACTIVE REVIEW GUI FOR VIDEOS ---
 
 def review_video_pair(path1, path2, meta1, meta2, similarity, on_decision):
-    import os
-    import tkinter as tk
-    from tkinter import ttk
-    from PIL import Image, ImageTk
-    import cv2
-
     class VideoReviewApp:
         def __init__(self, master):
             self.master = master
@@ -179,8 +173,8 @@ def review_video_pair(path1, path2, meta1, meta2, similarity, on_decision):
             ttk.Button(btn_frame, text="D: Keep Right", command=lambda: self.decision('right')).pack(fill=tk.X, pady=2)
             ttk.Button(btn_frame, text="W: Keep Both", command=lambda: self.decision('both')).pack(fill=tk.X, pady=2)
             ttk.Button(btn_frame, text="S: Skip", command=lambda: self.decision('skip')).pack(fill=tk.X, pady=2)
-            ttk.Button(btn_frame, text="Q: Quit", command=lambda: self.decision('quit')).pack(fill=tk.X, pady=2)
             ttk.Button(btn_frame, text="P: Replay", command=self.replay).pack(fill=tk.X, pady=2)
+            ttk.Button(btn_frame, text="Q: Quit", command=lambda: self.decision('quit')).pack(fill=tk.X, pady=2)
 
         def bind_keys(self):
             self.master.bind("a", lambda e: self.decision('left'))

@@ -1,5 +1,5 @@
 import hashlib
-from PIL import Image, ImageTk, UnidentifiedImageError
+from PIL import Image, UnidentifiedImageError
 import imagehash
 import cv2
 from config import DEFAULT_VIDEO_FRAMES

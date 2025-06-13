@@ -5,7 +5,7 @@ import cv2
 import numpy as np
 
 # Import the review functions from your module:
-from main import review_image_pair, review_video_pair
+from gui import review_image_pair, review_video_pair
 
 # -- Test image GUI --
 # Create two dummy images:
