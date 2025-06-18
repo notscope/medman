@@ -3,7 +3,7 @@ import argparse
 import os
 import warnings
 from clustering import cluster_images, cluster_videos, handle_image_cluster, handle_video_cluster
-from config import DEFAULT_VIDEO_FRAMES, LOW_THRESHOLD, HIGH_THRESHOLD
+from config import DEFAULT_VIDEO_FRAMES, LOW_THRESHOLD, HIGH_THRESHOLD, MAX_WORKERS, MAX_PHASH_WORKERS, MAX_SHA_WORKERS
 
 warnings.filterwarnings("ignore", category=UserWarning, module="PIL")
 
@@ -58,14 +58,14 @@ def main():
 
     # Cluster images
     print("[INFO] Clustering images...")
-    img_clusters = cluster_images(image_paths, threshold)
+    img_clusters = cluster_images(image_paths, threshold, MAX_SHA_WORKERS, MAX_PHASH_WORKERS)
     print(f"[INFO] Found {len(img_clusters)} image duplicate cluster(s).")
     for idx, cluster in enumerate(img_clusters, start=1):
         handle_image_cluster(cluster, args.interactive, duplicates_dir, idx, len(img_clusters))
 
     # Cluster videos
     print("[INFO] Clustering videos...")
-    vid_clusters = cluster_videos(video_paths, threshold, sample_count)
+    vid_clusters = cluster_videos(video_paths, threshold, sample_count, MAX_SHA_WORKERS, MAX_PHASH_WORKERS)
     print(f"[INFO] Found {len(vid_clusters)} video duplicate cluster(s).")
     for idx, cluster in enumerate(vid_clusters, start=1):
         handle_video_cluster(cluster, args.interactive, duplicates_dir, sample_count, idx, len(vid_clusters))

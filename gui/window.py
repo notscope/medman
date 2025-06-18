@@ -51,14 +51,13 @@ class ReviewWindow:
 
         # Build UI
         self.master.title("Video Duplicate Review" if self.video else "Image Duplicate Review")
-
-
-        # Optional: set a minimum size
+        
+        # Set a minimum size
         if self.video:
             # wide layout
-            self.master.minsize(self.box_w*2 + 300, self.box_h + 200)
+            self.master.minsize(self.box_w*2 + 300, self.box_h + 100)
         else:
-            self.master.minsize(self.box_w*2 + 300, self.box_h + 200)
+            self.master.minsize(self.box_w*2 + 300, self.box_h + 100)
         self.build_ui()
         self.bind_keys()
         if self.video:
@@ -256,7 +255,6 @@ class ReviewWindow:
 
 
 # Helper functions to launch the window for images or videos:
-
 def review_image_pair(path1, path2, meta1, meta2, similarity, on_decision, cluster_index=None, cluster_total=None):
     # Launch an image-review window
     root = tk.Tk()
