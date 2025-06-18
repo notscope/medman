@@ -7,7 +7,6 @@ import random
 
 from gui.window import review_image_pair, review_video_pair
 
-
 # -- Test image GUI --
 # Create two dummy images:
 tmp1 = tempfile.NamedTemporaryFile(suffix=".png", delete=False)

@@ -60,15 +60,17 @@ def main():
     print("[INFO] Clustering images...")
     img_clusters = cluster_images(image_paths, threshold)
     print(f"[INFO] Found {len(img_clusters)} image duplicate cluster(s).")
-    for cluster in img_clusters:
-        handle_image_cluster(cluster, args.interactive, duplicates_dir)
+    for idx, cluster in enumerate(img_clusters, start=1):
+        handle_image_cluster(cluster, args.interactive, duplicates_dir, idx, len(img_clusters))
 
     # Cluster videos
     print("[INFO] Clustering videos...")
     vid_clusters = cluster_videos(video_paths, threshold, sample_count)
     print(f"[INFO] Found {len(vid_clusters)} video duplicate cluster(s).")
-    for cluster in vid_clusters:
-        handle_video_cluster(cluster, args.interactive, duplicates_dir, sample_count)
+    for idx, cluster in enumerate(vid_clusters, start=1):
+        handle_video_cluster(cluster, args.interactive, duplicates_dir, sample_count, idx, len(vid_clusters))
+
+    print("[INFO] Processing complete.")
 
 if __name__ == "__main__":
     main()

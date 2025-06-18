@@ -5,7 +5,7 @@ from PIL import Image, ImageTk
 import cv2
 
 class ReviewWindow:
-    def __init__(self, master, path1, path2, meta1, meta2, similarity, on_decision, video=False):
+    def __init__(self, master, path1, path2, meta1, meta2, similarity, on_decision, video=False, cluster_index=None, cluster_total=None):
         """
         master: a tk.Tk() or tk.Toplevel() instance
         path1, path2: file paths (images or videos)
@@ -13,6 +13,8 @@ class ReviewWindow:
         similarity: float in [0,1]
         on_decision: callback function accepting one argument: choice string in {'left','right','both','skip','quit'}
         video: bool, True=video mode, False=image mode
+        cluster_index: int, index of this pair in the cluster (if applicable)
+        cluster_total: int, total pairs in the cluster (if applicable)
         """
         self.master = master
         self.item_path1 = path1
@@ -22,6 +24,8 @@ class ReviewWindow:
         self.similarity = similarity
         self.on_decision = on_decision
         self.video = video
+        self.cluster_index = cluster_index
+        self.cluster_total = cluster_total
         self.decision_made = False
 
         # Define box sizes
@@ -107,8 +111,12 @@ class ReviewWindow:
         content = ttk.Frame(center_frame)
         content.grid(row=1, column=0)
 
-        # Similarity and metadata label
+        # Cluster, similarity and metadata label
         # For video, show similarity first; metadata lines below
+        if self.cluster_index is not None and self.cluster_total is not None:
+            cluster_info = f"Cluster {self.cluster_index} of {self.cluster_total}\n"
+            ttk.Label(content, text=cluster_info, justify=tk.CENTER).pack()
+
         sim_text = f"Similarity: {self.similarity * 100:.2f}%\n"
         if self.video:
             meta_text = f"Left: {self.format_meta(self.meta1)}\nRight: {self.format_meta(self.meta2)}"
@@ -249,14 +257,14 @@ class ReviewWindow:
 
 # Helper functions to launch the window for images or videos:
 
-def review_image_pair(path1, path2, meta1, meta2, similarity, on_decision):
+def review_image_pair(path1, path2, meta1, meta2, similarity, on_decision, cluster_index=None, cluster_total=None):
     # Launch an image-review window
     root = tk.Tk()
-    ReviewWindow(root, path1, path2, meta1, meta2, similarity, on_decision, video=False)
+    ReviewWindow(root, path1, path2, meta1, meta2, similarity, on_decision, video=False, cluster_index=cluster_index, cluster_total=cluster_total)
     root.mainloop()
 
-def review_video_pair(path1, path2, meta1, meta2, similarity, on_decision):
+def review_video_pair(path1, path2, meta1, meta2, similarity, on_decision, cluster_index=None, cluster_total=None):
     # Launch a video-review window.
     root = tk.Tk()
-    ReviewWindow(root, path1, path2, meta1, meta2, similarity, on_decision, video=True)
+    ReviewWindow(root, path1, path2, meta1, meta2, similarity, on_decision, video=True, cluster_index=cluster_index, cluster_total=cluster_total)
     root.mainloop()
