@@ -3,7 +3,9 @@ from hashing import hash_file_sha256, hash_image_phash, hash_video_frames, compa
 from move_files import move_to_duplicates, print_action
 from scoring import score_image, score_video
 from metadata import get_image_metadata, get_video_metadata
-from gui import review_image_pair, review_video_pair
+# from gui.review_photo import review_image_pair
+# from gui.review_video import review_video_pair
+from gui.window import review_image_pair, review_video_pair
 
 # --- CLUSTERING UTILITIES ---
 
