@@ -123,16 +123,16 @@ def make_animated_video(filename, bg_color=(30, 30, 60), size=(320, 240)):
 
 # Usage example:
 if __name__ == "__main__":
-    tmpv1 = "animated1.mp4"
-    tmpv2 = "animated2.mp4"
-    make_animated_video(tmpv1, bg_color=(30, 30, 60), size=size1)
-    make_animated_video(tmpv2, bg_color=(60, 30, 30), size=size2)
+    tmp_vid_1 = "animated1.mp4"
+    tmp_vid_2 = "animated2.mp4"
+    make_animated_video(tmp_vid_1, bg_color=(30, 30, 60), size=size1)
+    make_animated_video(tmp_vid_2, bg_color=(60, 30, 30), size=size2)
     # Now call your review_video_pair:
-    meta_v1 = ((width1, height1), duration_secs, os.path.getsize(tmpv1))
-    meta_v2 = ((width2, height2), duration_secs, os.path.getsize(tmpv2))
+    meta_v1 = ((width1, height1), duration_secs, os.path.getsize(tmp_vid_1))
+    meta_v2 = ((width2, height2), duration_secs, os.path.getsize(tmp_vid_2))
     sim_v = 0.5
     def on_decision_vid(choice):
         print("Video GUI decision:", choice)
-    review_video_pair(tmpv1, tmpv2, meta_v1, meta_v2, sim_v, on_decision_vid)
-    os.remove(tmpv1)
-    os.remove(tmpv2)
+    review_video_pair(tmp_vid_1, tmp_vid_2, meta_v1, meta_v2, sim_v, on_decision_vid)
+    os.remove(tmp_vid_1)
+    os.remove(tmp_vid_2)
