@@ -25,12 +25,20 @@ def main():
     parser.add_argument("--threshold", type=float, help="Similarity threshold (0.0–1.0)")
     parser.add_argument("--video-frames", type=int, default=DEFAULT_VIDEO_FRAMES,
                         help="Frames to sample for video hashing")
+    parser.add_argument("--image-only", action="store_true",
+                        help="Only process images, skip videos")
+    parser.add_argument("--video-only", action="store_true",
+                        help="Only process videos, skip images")
     args = parser.parse_args()
+
+    # Validate options
+    if args.image_only and args.video_only:
+        parser.error("Cannot use both --image-only and --video-only options together.")
 
     # Validate threshold
     if args.threshold is not None:
         if not (0.0 <= args.threshold <= 1.0):
-            parser.error(f"--threshold must be between 0.0 and 1.0, got {args.threshold}")
+            parser.error(f"--threshold must be between 0.0 and 1.0, got {args.threshold} instead.")
         threshold = args.threshold
     else:
         threshold = LOW_THRESHOLD if args.interactive else HIGH_THRESHOLD
@@ -56,19 +64,34 @@ def main():
             elif is_video(f):
                 video_paths.append(p)
 
+    if args.image_only:
+        print("[INFO] Image-only mode enabled")
+        print("[INFO] Clustering images...")
+        img_clusters = cluster_images(image_paths, threshold, MAX_SHA_WORKERS, MAX_PHASH_WORKERS)
+        print(f"[INFO] Found {len(img_clusters)} image duplicate cluster(s).")
+        for idx, cluster in enumerate(img_clusters, start=1):
+            handle_image_cluster(cluster, args.interactive, duplicates_dir, idx, len(img_clusters))
+    elif args.video_only:
+        print("[INFO] Video-only mode enabled")
+        print("[INFO] Clustering videos...")
+        vid_clusters = cluster_videos(video_paths, threshold, sample_count, MAX_SHA_WORKERS, MAX_PHASH_WORKERS)
+        print(f"[INFO] Found {len(vid_clusters)} video duplicate cluster(s).")
+        for idx, cluster in enumerate(vid_clusters, start=1):
+            handle_video_cluster(cluster, args.interactive, duplicates_dir, sample_count, idx, len(vid_clusters))
+    else:
     # Cluster images
-    print("[INFO] Clustering images...")
-    img_clusters = cluster_images(image_paths, threshold, MAX_SHA_WORKERS, MAX_PHASH_WORKERS)
-    print(f"[INFO] Found {len(img_clusters)} image duplicate cluster(s).")
-    for idx, cluster in enumerate(img_clusters, start=1):
-        handle_image_cluster(cluster, args.interactive, duplicates_dir, idx, len(img_clusters))
+        print("[INFO] Clustering images...")
+        img_clusters = cluster_images(image_paths, threshold, MAX_SHA_WORKERS, MAX_PHASH_WORKERS)
+        print(f"[INFO] Found {len(img_clusters)} image duplicate cluster(s).")
+        for idx, cluster in enumerate(img_clusters, start=1):
+            handle_image_cluster(cluster, args.interactive, duplicates_dir, idx, len(img_clusters))
 
-    # Cluster videos
-    print("[INFO] Clustering videos...")
-    vid_clusters = cluster_videos(video_paths, threshold, sample_count, MAX_SHA_WORKERS, MAX_PHASH_WORKERS)
-    print(f"[INFO] Found {len(vid_clusters)} video duplicate cluster(s).")
-    for idx, cluster in enumerate(vid_clusters, start=1):
-        handle_video_cluster(cluster, args.interactive, duplicates_dir, sample_count, idx, len(vid_clusters))
+        # Cluster videos
+        print("[INFO] Clustering videos...")
+        vid_clusters = cluster_videos(video_paths, threshold, sample_count, MAX_SHA_WORKERS, MAX_PHASH_WORKERS)
+        print(f"[INFO] Found {len(vid_clusters)} video duplicate cluster(s).")
+        for idx, cluster in enumerate(vid_clusters, start=1):
+            handle_video_cluster(cluster, args.interactive, duplicates_dir, sample_count, idx, len(vid_clusters))
 
     print("[INFO] Processing complete.")
 
