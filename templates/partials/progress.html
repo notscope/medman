@@ -1,0 +1,30 @@
+<div class="card text-center" hx-get="/scan/status"
+    hx-trigger="{% if state.status == 'scanning' %}every 1s{% else %}none{% endif %}" hx-swap="outerHTML">
+
+    {% if state.status == "scanning" %}
+    <h3>Scanning...</h3>
+    <p class="progress-text">{{ state.progress }}</p>
+    <div class="progress-bar-wrapper mb-3"
+        style="background: #e9ecef; border-radius: 8px; overflow: hidden; height: 12px; width: 100%; margin: 10px 0;">
+        <div class="progress-bar-fill"
+            style="background: var(--primary-color, #007bff); height: 100%; width: {{ state.progress_percent }}%; transition: width 0.3s ease;">
+        </div>
+    </div>
+    {% elif state.status == "ready" %}
+    <div class="completion-box">
+        <p class="done-text mb-3">✅ Scan complete! Found {{ state.clusters|length }} clusters to review.</p>
+        <a href="/review" class="btn btn-success">Start Review</a>
+    </div>
+    {% elif state.status == "done" %}
+    {% if state.clusters|length == 0 %}
+    <p class="done-text">✨ Check complete. No duplicates found.</p>
+    {% else %}
+    <p class="done-text">✅ All done!</p>
+    {% endif %}
+    {% elif state.status == "error" %}
+    <div class="alert alert-danger">
+        <p>{{ state.progress }}</p>
+        <a href="/" class="btn btn-secondary mt-2">Back to Dashboard</a>
+    </div>
+    {% endif %}
+</div>

@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}MedMan - Dashboard{% endblock %}
+
+{% block content %}
+<header class="header">
+    <div style="display: flex; justify-content: flex-end; padding: 10px;">
+        <span style="color: var(--text-secondary); margin-right: 15px;">User: {{ user }}</span>
+        <a href="/logout" class="btn btn-outline"
+            style="font-size: 0.8rem; padding: 6px 12px; border: 1px solid var(--border); color: var(--text-secondary); text-decoration: none; border-radius: var(--radius-sm);">Logout</a>
+    </div>
+    <h1 class="logo">📁 MedMan</h1>
+    <p class="subtitle">Smart Media Deduplication Tool</p>
+</header>
+
+<main class="main-content">
+    <div class="card">
+        <h2>Scan Directory</h2>
+        <form hx-post="/scan" hx-target="#scan-area" hx-swap="innerHTML" class="scan-form">
+            <div class="form-group">
+                <label for="directory">Directory Path</label>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="directory" name="directory" placeholder="/path/to/your/media" required
+                        autofocus style="flex: 1;">
+                    <button type="button" class="btn btn-outline" onclick="openFileBrowser()">Browse</button>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="threshold" class="threshold-label">Similarity Threshold (0.0-1.0):
+                    <input type="number" id="threshold" name="threshold" value="0.89" step="0.01" min="0.5" max="1.0"
+                        class="input-field">
+                </label>
+            </div>
+            <button type="submit" class="btn btn-primary">Start Scan</button>
+        </form>
+    </div>
+
+    <div id="scan-area">
+        {% if state.status == "scanning" %}
+        {% include "partials/progress.html" %}
+        {% elif state.status == "ready" %}
+        <div class="card text-center">
+            <p class="progress-text">{{ state.progress }}</p>
+            <a href="/review" class="btn btn-success">Start Review</a>
+        </div>
+        {% elif state.status == "done" %}
+        {% with hide_home_link=True %}
+        {% include "partials/done.html" %}
+        {% endwith %}
+        {% endif %}
+    </div>
+</main>
+
+<footer class="footer">
+    <p>MedMan &copy; 2026 | <a href="https://github.com/notscope/medman" target="_blank">GitHub</a></p>
+</footer>
+
+<!-- File Browser Modal -->
+<div id="file-browser-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Select Directory</h3>
+            <span class="close" onclick="closeFileBrowser()">&times;</span>
+        </div>
+        <div id="file-browser-content" class="modal-body">
+            <p>Loading...</p>
+        </div>
+    </div>
+</div>
+
+<script>
+    function openFileBrowser() {
+        const modal = document.getElementById('file-browser-modal');
+        // Load initial content
+        htmx.ajax('GET', '/api/browse', { target: '#file-browser-content' });
+        modal.style.display = "block";
+    }
+
+    function closeFileBrowser() {
+        document.getElementById('file-browser-modal').style.display = "none";
+    }
+
+    function selectDirectory(path) {
+        document.getElementById('directory').value = path;
+        closeFileBrowser();
+    }
+
+    // Close on outside click
+    window.onclick = function (event) {
+        const modal = document.getElementById('file-browser-modal');
+        if (event.target == modal) {
+            closeFileBrowser();
+        }
+    }
+</script>
+{% endblock %}

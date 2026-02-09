@@ -1,0 +1,42 @@
+<div class="file-browser-nav">
+    <div class="breadcrumbs">
+        {% for crumb in breadcrumbs %}
+        <a href="#" class="crumb" hx-get="/api/browse?path={{ crumb.path }}" hx-target="#file-browser-content">
+            {{ crumb.name }}
+        </a>
+        {% if not loop.last %}
+        <span class="crumb-separator">/</span>
+        {% endif %}
+        {% endfor %}
+    </div>
+    <div class="browser-actions">
+        <button class="btn btn-sm btn-primary" onclick="selectDirectory('{{ current_path }}')">
+            Select This Folder
+        </button>
+    </div>
+</div>
+
+<div class="file-grid">
+    {% if parent_path and current_path != parent_path %}
+    <div class="file-item folder-up" hx-get="/api/browse?path={{ parent_path }}" hx-target="#file-browser-content">
+        <div class="file-icon">⬆️</div>
+        <div class="file-name">..</div>
+    </div>
+    {% endif %}
+
+    {% if not items %}
+    {% if not parent_path %}
+    <div class="empty-state">
+        <p>No subdirectories here.</p>
+    </div>
+    {% endif %}
+    {% else %}
+    {% for item in items %}
+    <div class="file-item folder" hx-get="/api/browse?path={{ current_path }}/{{ item }}"
+        hx-target="#file-browser-content">
+        <div class="file-icon">📁</div>
+        <div class="file-name" title="{{ item }}">{{ item }}</div>
+    </div>
+    {% endfor %}
+    {% endif %}
+</div>

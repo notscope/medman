@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+{% block title %}MedMan - Review Duplicates{% endblock %}
+
+{% block content %}
+<header class="header header-compact">
+    <a href="/" class="logo-link">
+        <h1 class="logo">📁 MedMan</h1>
+    </a>
+    <div class="header-actions">
+        <button id="slider-toggle" class="btn btn-toggle" onclick="toggleSliderMode()">
+            <span class="key">C</span> Compare Slider
+        </button>
+        <span class="cluster-info">Cluster {{ cluster_index }} of {{ cluster_total }}</span>
+    </div>
+</header>
+
+<!-- Normal Side-by-Side View -->
+<main id="normal-view" class="review-container">
+    <div class="media-panel left-panel">
+        <div class="media-box">
+            {% if cluster_type == "image" %}
+            <img src="/media{{ left_path }}" alt="Left Image" class="media-preview">
+            {% else %}
+            <video src="/media{{ left_path }}" class="media-preview" autoplay muted loop></video>
+            {% endif %}
+        </div>
+        <div class="media-info">
+            <p class="filename">{{ left_name }}</p>
+            {% if cluster_type == "image" %}
+            <p class="meta">{{ meta_left[0][0] }}x{{ meta_left[0][1] }} | {{ (meta_left[1] / 1024)|int }} KB</p>
+            {% else %}
+            <p class="meta">{{ meta_left[0][0] }}x{{ meta_left[0][1] }} | {{ "%.1f"|format(meta_left[1]) }}s | {{
+                (meta_left[2] / 1024)|int }} KB</p>
+            {% endif %}
+            <p class="filepath" title="{{ left_path }}">{{ left_truncated }}</p>
+        </div>
+    </div>
+
+    <div class="center-panel">
+        <div class="similarity-badge">
+            <span class="sim-value">{{ "%.1f"|format(similarity * 100) }}%</span>
+            <span class="sim-label">Similarity</span>
+        </div>
+
+        <form id="decision-form" hx-post="/decision" hx-target="body" hx-swap="outerHTML">
+            <input type="hidden" name="choice" id="choice-input" value="">
+            <div class="btn-group">
+                <button type="submit" class="btn btn-left"
+                    onclick="document.getElementById('choice-input').value='left'">
+                    <span class="key">A</span> Keep Left
+                </button>
+                <button type="submit" class="btn btn-right"
+                    onclick="document.getElementById('choice-input').value='right'">
+                    <span class="key">D</span> Keep Right
+                </button>
+                <button type="submit" class="btn btn-both"
+                    onclick="document.getElementById('choice-input').value='both'">
+                    <span class="key">W</span> Keep Both
+                </button>
+                <button type="submit" class="btn btn-skip"
+                    onclick="document.getElementById('choice-input').value='skip'">
+                    <span class="key">S</span> Skip
+                </button>
+                <button type="button" class="btn btn-undo" hx-post="/review/undo" hx-target="body">
+                    <span class="key">Z</span> Undo
+                </button>
+                <a href="/" class="btn btn-quit">
+                    <span class="key">Q</span> Quit
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <div class="media-panel right-panel">
+        <div class="media-box">
+            {% if cluster_type == "image" %}
+            <img src="/media{{ right_path }}" alt="Right Image" class="media-preview">
+            {% else %}
+            <video src="/media{{ right_path }}" class="media-preview" autoplay muted loop></video>
+            {% endif %}
+        </div>
+        <div class="media-info">
+            <p class="filename">{{ right_name }}</p>
+            {% if cluster_type == "image" %}
+            <p class="meta">{{ meta_right[0][0] }}x{{ meta_right[0][1] }} | {{ (meta_right[1] / 1024)|int }} KB</p>
+            {% else %}
+            <p class="meta">{{ meta_right[0][0] }}x{{ meta_right[0][1] }} | {{ "%.1f"|format(meta_right[1]) }}s | {{
+                (meta_right[2] / 1024)|int }} KB</p>
+            {% endif %}
+            <p class="filepath" title="{{ right_path }}">{{ right_truncated }}</p>
+        </div>
+    </div>
+</main>
+
+<!-- Slider Comparison View -->
+<div id="slider-view" class="slider-view hidden">
+    <div class="slider-container" id="slider-container">
+        <div class="slider-image slider-image-left">
+            {% if cluster_type == "image" %}
+            <img src="/media{{ left_path }}" alt="Left" draggable="false">
+            {% else %}
+            <video src="/media{{ left_path }}" autoplay muted loop draggable="false"></video>
+            {% endif %}
+        </div>
+        <div class="slider-image slider-image-right" id="slider-right">
+            {% if cluster_type == "image" %}
+            <img src="/media{{ right_path }}" alt="Right" draggable="false">
+            {% else %}
+            <video src="/media{{ right_path }}" autoplay muted loop draggable="false"></video>
+            {% endif %}
+        </div>
+        <div class="slider-handle" id="slider-handle">
+            <div class="slider-line"></div>
+            <div class="slider-grip">⟷</div>
+        </div>
+    </div>
+    <div class="slider-labels">
+        <span class="slider-label-left">← Left ({{ left_name }})</span>
+        <span class="slider-label-right">Right ({{ right_name }}) →</span>
+    </div>
+    <p class="slider-hint">Drag the slider to compare • Press <span class="key">C</span> to exit</p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let sliderMode = false;
+
+    function toggleSliderMode() {
+        sliderMode = !sliderMode;
+        const normalView = document.getElementById('normal-view');
+        const sliderView = document.getElementById('slider-view');
+        const toggleBtn = document.getElementById('slider-toggle');
+
+        if (sliderMode) {
+            normalView.classList.add('hidden');
+            sliderView.classList.remove('hidden');
+            toggleBtn.classList.add('active');
+            initSlider();
+        } else {
+            normalView.classList.remove('hidden');
+            sliderView.classList.add('hidden');
+            toggleBtn.classList.remove('active');
+        }
+    }
+
+    function initSlider() {
+        const container = document.getElementById('slider-container');
+        const handle = document.getElementById('slider-handle');
+        const rightImage = document.getElementById('slider-right');
+
+        let isDragging = false;
+
+        function updateSlider(x) {
+            const rect = container.getBoundingClientRect();
+            let pos = ((x - rect.left) / rect.width) * 100;
+            pos = Math.max(0, Math.min(100, pos));
+            handle.style.left = pos + '%';
+            rightImage.style.clipPath = `inset(0 0 0 ${pos}%)`;
+        }
+
+        handle.addEventListener('mousedown', () => isDragging = true);
+        document.addEventListener('mouseup', () => isDragging = false);
+        document.addEventListener('mousemove', (e) => {
+            if (isDragging) updateSlider(e.clientX);
+        });
+
+        container.addEventListener('click', (e) => updateSlider(e.clientX));
+
+        // Touch support
+        handle.addEventListener('touchstart', () => isDragging = true);
+        document.addEventListener('touchend', () => isDragging = false);
+        document.addEventListener('touchmove', (e) => {
+            if (isDragging && e.touches[0]) updateSlider(e.touches[0].clientX);
+        });
+
+        // Initialize at 50%
+        updateSlider(container.getBoundingClientRect().left + container.offsetWidth / 2);
+    }
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function (e) {
+        const key = e.key.toLowerCase();
+        const choiceInput = document.getElementById('choice-input');
+        const form = document.getElementById('decision-form');
+
+        if (key === 'c') {
+            toggleSliderMode();
+        } else if (!sliderMode) {
+            if (key === 'a') {
+                choiceInput.value = 'left';
+                form.requestSubmit();
+            } else if (key === 'd') {
+                choiceInput.value = 'right';
+                form.requestSubmit();
+            } else if (key === 'w') {
+                choiceInput.value = 'both';
+                form.requestSubmit();
+            } else if (key === 's') {
+                choiceInput.value = 'skip';
+                form.requestSubmit();
+            } else if (key === 'z') {
+                const undoBtn = document.querySelector('.btn-undo');
+                if (undoBtn) undoBtn.click();
+            } else if (key === 'q') {
+                window.location.href = '/';
+            }
+        }
+    });
+</script>
+{% endblock %}

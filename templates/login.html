@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}MedMan - Login{% endblock %}
+
+{% block content %}
+<div class="container" style="display: flex; align-items: center; justify-content: center; height: 100vh;">
+    <div class="card" style="width: 100%; max-width: 400px;">
+        <div class="text-center">
+            <h1 class="logo" style="font-size: 2.5rem; margin-bottom: 10px;">📁 MedMan</h1>
+            <p class="subtitle" style="margin-bottom: 30px;">Login to access</p>
+        </div>
+
+        {% if error %}
+        <div class="card error-card" style="padding: 15px; margin-bottom: 20px; text-align: center;">
+            <p class="error-text" style="margin: 0;">{{ error }}</p>
+        </div>
+        {% endif %}
+
+        <form method="post" action="/login" class="scan-form">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" required autofocus>
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <button type="submit" class="btn btn-primary" style="margin-top: 10px;">Login</button>
+        </form>
+    </div>
+</div>
+{% endblock %}
