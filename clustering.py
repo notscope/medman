@@ -1,10 +1,9 @@
 import os
 from tqdm import tqdm
-from hashing import hash_file_sha256, hash_image_phash, hash_video_frames, compare_video_hashes, hash_file_parallel, hash_image_parallel, hash_video_parallel
+from hashing import hash_file_sha256, hash_image_phash, hash_video_frames, compare_video_hashes, hash_fingerprint_parallel, hash_file_parallel, hash_image_parallel, hash_video_parallel
 from move_files import move_to_duplicates, print_action
 from scoring import score_image, score_video
 from metadata import get_image_metadata, get_video_metadata
-from gui.window import review_image_pair, review_video_pair
 
 # --- CLUSTERING UTILITIES ---
 
@@ -20,92 +19,114 @@ class UnionFind:
         if rx != ry:
             self.parent[ry] = rx
 
-def cluster_images(image_paths, threshold, sha_workers=8, phash_workers=8):
+def cluster_images(image_paths, threshold, sha_workers=8, phash_workers=8, progress_callback=None):
     """
-    Cluster images by SHA and perceptual hash, parallelized with tqdm bars.
-    - image_paths: list of file paths
-    - threshold: float between 0 and 1
-    - sha_workers / phash_workers: thread counts
+    Cluster images with a multi-stage approach for speed and accuracy:
+    1) Fingerprint (Size + MD5 of ends) to group potential candidates
+    2) Full SHA-256 to split fingerprint groups into bit-identical sets
+    3) Parallel pHash for representatives of each SHA group
     """
-    # 1) SHA groups in parallel
-    sha_results = hash_file_parallel(image_paths, max_workers=sha_workers)
-    sha_map = {}
-    for path, sha in sha_results.items():
-        sha_map.setdefault(sha, []).append(path)
+    def sub_cb(stage_name):
+        if not progress_callback: return None
+        def cb(curr, tot):
+            progress_callback(f"{stage_name}: {curr}/{tot}", curr, tot)
+        return cb
+
+    # 1) Fingerprint groups in parallel
+    fingerprints = hash_fingerprint_parallel(image_paths, max_workers=sha_workers, progress_callback=sub_cb("Fingerprinting"))
+    fp_map = {}
+    for path, fp in fingerprints.items():
+        fp_map.setdefault(fp, []).append(path)
+
+    # 2) Refine fingerprint groups with Full SHA-256
+    # Only need SHA for files that share a fingerprint
+    to_sha = []
+    for paths in fp_map.values():
+        if len(paths) > 1:
+            to_sha.extend(paths)
+    
+    sha_results = hash_file_parallel(to_sha, max_workers=sha_workers, progress_callback=sub_cb("SHA Hashing"))
+    
+    # Final exact groups (SHA-256 as key)
+    # For files with unique fingerprints, we use path as unique key
+    exact_map = {}
+    for path, fp in fingerprints.items():
+        if path in sha_results:
+            key = sha_results[path]
+        else:
+            key = f"unique_{path}"
+        exact_map.setdefault(key, []).append(path)
 
     uf = UnionFind()
-    # Union exact duplicates
-    for paths in sha_map.values():
-        if len(paths) > 1:
-            first = paths[0]
-            for other in paths[1:]:
-                uf.union(first, other)
-
-    # 2) Representatives for perceptual hash
-    # We take one representative per sha group
-    reps = [paths[0] for paths in sha_map.values()]
-    # Compute pHash in parallel
-    phash_results = hash_image_parallel(reps, max_workers=phash_workers)
-    # Filter out those with None
-    phashes = {p: h for p, h in phash_results.items()}
-
-    # 3) Compare perceptual hashes pairwise
-    reps_valid = list(phashes.keys())
+    
+    # 3) Representatives for perceptual hash
+    # We only need to check one file per exact SHA group
+    reps = [paths[0] for paths in exact_map.values()]
+    # Parallel pHash (using ProcessPool)
+    phash_results = hash_image_parallel(reps, max_workers=phash_workers, progress_callback=sub_cb("pHash"))
+    
+    # 4) Compare perceptual hashes pairwise
+    reps_valid = list(phash_results.keys())
     n = len(reps_valid)
-    # Outer loop with tqdm
     for i in tqdm(range(n), desc="Comparing images"):
         p1 = reps_valid[i]
-        h1 = phashes[p1]
+        h1 = phash_results[p1]
         for j in range(i+1, n):
             p2 = reps_valid[j]
-            h2 = phashes[p2]
-            # compute similarity
+            h2 = phash_results[p2]
             sim = 1 - (h1 - h2) / 64.0
             if sim >= threshold:
                 uf.union(p1, p2)
 
-    # 4) Build clusters: include all files in each sha group whose rep falls into a union-find set with size>1
+    # 5) Build clusters
     clusters = {}
-    for paths in sha_map.values():
+    for paths in exact_map.values():
         rep = paths[0]
-        if rep in uf.parent:  # has been seen in union-find
-            root = uf.find(rep)
-            clusters.setdefault(root, []).extend(paths)
+        root = uf.find(rep)
+        clusters.setdefault(root, []).extend(paths)
 
-    # Return only groups with more than one file
     return [group for group in clusters.values() if len(group) > 1]
 
-def cluster_videos(video_paths, threshold, sample_count, sha_workers=8, phash_workers=8):
+def cluster_videos(video_paths, threshold, sample_count, sha_workers=8, phash_workers=8, progress_callback=None):
     """
-    Cluster video files by SHA and perceptual-frame-hash similarity, parallelized.
-    - video_paths: list of file paths
-    - threshold: similarity threshold (0.0–1.0)
-    - sample_count: frames to sample per video
-    - sha_workers: threads for SHA
-    - phash_workers: processes for video hashing
+    Cluster videos with a multi-stage approach for speed and accuracy.
     """
-    # 1) SHA groups in parallel
-    sha_results = hash_file_parallel(video_paths, max_workers=sha_workers)
-    sha_map = {}
-    for path, sha in sha_results.items():
-        sha_map.setdefault(sha, []).append(path)
+    def sub_cb(stage_name):
+        if not progress_callback: return None
+        def cb(curr, tot):
+            progress_callback(f"{stage_name}: {curr}/{tot}", curr, tot)
+        return cb
+
+    # 1) Fingerprint groups
+    fingerprints = hash_fingerprint_parallel(video_paths, max_workers=sha_workers, progress_callback=sub_cb("Fingerprinting"))
+    fp_map = {}
+    for path, fp in fingerprints.items():
+        fp_map.setdefault(fp, []).append(path)
+
+    # 2) Refine with Full SHA-256
+    to_sha = []
+    for paths in fp_map.values():
+        if len(paths) > 1:
+            to_sha.extend(paths)
+    
+    sha_results = hash_file_parallel(to_sha, max_workers=sha_workers, progress_callback=sub_cb("SHA Hashing"))
+    
+    exact_map = {}
+    for path, fp in fingerprints.items():
+        if path in sha_results:
+            key = sha_results[path]
+        else:
+            key = f"unique_{path}"
+        exact_map.setdefault(key, []).append(path)
 
     uf = UnionFind()
-    # Union exact duplicates
-    for paths in sha_map.values():
-        if len(paths) > 1:
-            first = paths[0]
-            for other in paths[1:]:
-                uf.union(first, other)
 
-    # 2) Representatives for perceptual-video hash
-    reps = [paths[0] for paths in sha_map.values()]
-    # Compute video-frame hashes in parallel
-    vhash_results = hash_video_parallel(reps, sample_count, max_workers=phash_workers)
-    # Filter only successful
+    # 3) Representatives for video hash
+    reps = [paths[0] for paths in exact_map.values()]
+    vhash_results = hash_video_parallel(reps, sample_count, max_workers=phash_workers, progress_callback=sub_cb("Video pHash"))
+    
+    # 4) Compare video hashes pairwise
     reps_valid = list(vhash_results.keys())
-
-    # 3) Compare perceptual hashes pairwise
     n = len(reps_valid)
     for i in tqdm(range(n), desc="Comparing videos"):
         p1 = reps_valid[i]
@@ -117,13 +138,12 @@ def cluster_videos(video_paths, threshold, sample_count, sha_workers=8, phash_wo
             if sim >= threshold:
                 uf.union(p1, p2)
 
-    # 4) Build clusters
+    # 5) Build clusters
     clusters = {}
-    for paths in sha_map.values():
+    for paths in exact_map.values():
         rep = paths[0]
-        if rep in uf.parent:
-            root = uf.find(rep)
-            clusters.setdefault(root, []).extend(paths)
+        root = uf.find(rep)
+        clusters.setdefault(root, []).extend(paths)
 
     return [group for group in clusters.values() if len(group) > 1]
 
@@ -156,6 +176,11 @@ def handle_image_cluster(cluster, interactive, duplicates_dir, cluster_index, cl
                 sim = 0.0
             else:
                 sim = 1 - (h1 - h2) / 64.0
+            
+            if sim < threshold:
+                # Pair doesn't meet perceptual threshold, skip comparison
+                continue
+
             # define handler to possibly update best
             def make_handler(b_list, o):
                 def handler(decision):
@@ -173,8 +198,23 @@ def handle_image_cluster(cluster, interactive, duplicates_dir, cluster_index, cl
                     elif decision == 'quit':
                         exit()
                 return handler
+            
             handler = make_handler(best, other)
-            review_image_pair(best[0], other, meta_best, meta_other, sim, handler, cluster_index=cluster_index, cluster_total=cluster_total)
+            
+            try:
+                from gui.window import review_image_pair
+                review_image_pair(best[0], other, meta_best, meta_other, sim, handler, cluster_index=cluster_index, cluster_total=cluster_total)
+            except (ImportError, RuntimeError, tk.TclError) if 'tk' in globals() else (ImportError, RuntimeError):
+                # Fallback to simple CLI prompt if GUI fails
+                print(f"\n[INTERACTIVE] Reviewing Cluster {cluster_index}/{cluster_total}")
+                print(f"Similarity: {sim*100:.1f}%")
+                print(f"Left: {best[0]} ({meta_best[0][0]}x{meta_best[0][1]})")
+                print(f"Right: {other} ({meta_other[0][0]}x{meta_other[0][1]})")
+                choice = input("Choice ( [A] Keep Left / [D] Keep Right / [W] Keep Both / [S] Skip / [Q] Quit ): ").lower()
+                decision_map = {'a': 'left', 'd': 'right', 'w': 'both', 's': 'skip', 'q': 'quit'}
+                handler(decision_map.get(choice, 'skip'))
+            except Exception as e:
+                 print(f"[ERROR] GUI review failed: {e}. Skipping interactive review for this pair.")
         else:
             # automatic: move other
             dest = move_to_duplicates(other, duplicates_dir)
@@ -203,6 +243,11 @@ def handle_video_cluster(cluster, interactive, duplicates_dir, sample_count, clu
             vhash_best = hash_video_frames(best[0], sample_count)
             vhash_other = hash_video_frames(other, sample_count)
             sim = compare_video_hashes(vhash_best, vhash_other)
+            
+            if sim < threshold:
+                # Pair doesn't meet perceptual threshold, skip comparison
+                continue
+
             def make_handler(b_list, o):
                 def handler(decision):
                     if decision == 'left':
@@ -217,8 +262,23 @@ def handle_video_cluster(cluster, interactive, duplicates_dir, sample_count, clu
                     elif decision == 'quit':
                         exit()
                 return handler
+            
             handler = make_handler(best, other)
-            review_video_pair(best[0], other, meta_best, meta_other, sim, handler, cluster_index=cluster_index, cluster_total=cluster_total)
+            
+            try:
+                from gui.window import review_video_pair
+                review_video_pair(best[0], other, meta_best, meta_other, sim, handler, cluster_index=cluster_index, cluster_total=cluster_total)
+            except (ImportError, RuntimeError):
+                # Fallback to CLI
+                print(f"\n[INTERACTIVE] Reviewing Video Cluster {cluster_index}/{cluster_total}")
+                print(f"Similarity: {sim*100:.1f}%")
+                print(f"Left: {best[0]} ({meta_best[0][0]}x{meta_best[0][1]}, {meta_best[1]:.1f}s)")
+                print(f"Right: {other} ({meta_other[0][0]}x{meta_other[0][1]}, {meta_other[1]:.1f}s)")
+                choice = input("Choice ( [A] Keep Left / [D] Keep Right / [W] Keep Both / [S] Skip / [Q] Quit ): ").lower()
+                decision_map = {'a': 'left', 'd': 'right', 'w': 'both', 's': 'skip', 'q': 'quit'}
+                handler(decision_map.get(choice, 'skip'))
+            except Exception as e:
+                print(f"[ERROR] GUI review failed: {e}. Skipping interactive review for this pair.")
         else:
             dest = move_to_duplicates(other, duplicates_dir)
             print_action("AUTO_VID", other, dest)
